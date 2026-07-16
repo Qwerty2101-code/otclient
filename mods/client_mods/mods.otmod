@@ -6,7 +6,5 @@ Module
   sandboxed: true
   load-later:
     - client_profiles
-    - game_buttons
     - game_itemselector
     - client_textedit
-    - game_bot
