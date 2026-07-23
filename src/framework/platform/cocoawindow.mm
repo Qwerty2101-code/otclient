@@ -45,6 +45,19 @@
 #include <framework/core/eventdispatcher.h>
 #include <framework/graphics/image.h>
 
+// Ventana del juego. Igual que NSWindow salvo que puede volverse key/main incluso con
+// styleMask borderless. Lo necesitamos para el fullscreen sin bordes (Opcion A): una
+// NSWindow borderless devuelve NO en canBecomeKeyWindow por defecto, lo que dejaria el
+// teclado muerto al entrar a fullscreen. En modo ventana (titled) el comportamiento no
+// cambia (ya devolvia YES).
+@interface OTGameWindow : NSWindow
+@end
+
+@implementation OTGameWindow
+- (BOOL)canBecomeKeyWindow { return YES; }
+- (BOOL)canBecomeMainWindow { return YES; }
+@end
+
 CocoaWindow::CocoaWindow()
 {
     m_window = nil;
@@ -217,14 +230,20 @@ void CocoaWindow::internalCreateWindow()
                            NSWindowStyleMaskMiniaturizable |
                            NSWindowStyleMaskResizable;
 
-    m_window = [[NSWindow alloc] initWithContentRect:frame
-                                           styleMask:styleMask
-                                             backing:NSBackingStoreBuffered
-                                               defer:NO];
+    m_window = [[OTGameWindow alloc] initWithContentRect:frame
+                                               styleMask:styleMask
+                                                 backing:NSBackingStoreBuffered
+                                                   defer:NO];
 
     [m_window setTitle:@"OTClient"];
     [m_window center];
     [m_window setMinSize:NSMakeSize(m_minimumSize.width(), m_minimumSize.height())];
+
+    // Deshabilitamos el fullscreen NATIVO de macOS (boton verde / Ctrl-Cmd-F). En Macs
+    // con notch, el fullscreen nativo mete el content view al area segura (bajo el notch)
+    // y descalibra el cursor. Nuestro setFullscreen usa fullscreen sin bordes en su lugar.
+    // Con esto el boton verde hace zoom y el unico camino a fullscreen es setFullscreen.
+    [m_window setCollectionBehavior:NSWindowCollectionBehaviorFullScreenNone];
 
     m_delegate = [[OTWindowDelegate alloc] init];
     [m_delegate setPlatformWindow:this];
@@ -486,17 +505,92 @@ void CocoaWindow::setMinimumSize(const Size& minimumSize)
 
 void CocoaWindow::setFullscreen(bool fullscreen)
 {
-    @autoreleasepool {
-        if (!m_window) return;
+    // Fullscreen SIN BORDES (Opcion A) en vez del fullscreen nativo de macOS.
+    //
+    // El fullscreen nativo ([m_window toggleFullScreen:]) coloca el content view dentro
+    // del AREA SEGURA en Macs con notch: en la pantalla del MacBook de Luis la pantalla
+    // mide 1470x956 puntos pero el content view quedaba en 1470x923 (faltaban 33 puntos
+    // de alto, el inset del notch/barra de menu). Como el mapeo del mouse en
+    // convertMousePosition usa la altura del bounds del view, el juego creia el cursor
+    // ~33px mas abajo -> hover descalibrado (p.ej. cursor en Store cae en la fila de
+    // abajo). En modo ventana no hay bug porque ahi no hay inset de area segura.
+    //
+    // La solucion: hacemos la ventana borderless y le damos el frame COMPLETO de la
+    // pantalla (956), evitando el inset de area segura del fullscreen nativo. Asi el
+    // content view mide igual que la pantalla y el mapeo del cursor queda 1:1.
+    //
+    // HILO: esta funcion la invoca el loop de UI/Lua desde el hilo del g_dispatcher
+    // (worker), NO el hilo principal (ver GraphicalApplication::run: mapThread corre
+    // poll()/Lua; el main corre mainPoll()/AppKit). Las mutaciones de ventana de AppKit
+    // deben correr en el main: [NSWindow setStyleMask:] dispara sincronicamente
+    // [NSOpenGLContext update], que aborta (EXC_BREAKPOINT) fuera del main thread. Por
+    // eso marshalamos todo via g_mainDispatcher, que se drena en mainPoll() (main
+    // thread) — mismo patron que X11Window::move/resize/show.
+    if (!m_window) return;
+    if (fullscreen == m_fullscreen) return;
+    m_fullscreen = fullscreen;  // estado logico (el guard de arriba y isFullscreen())
 
-        if (fullscreen != m_fullscreen) {
+    g_mainDispatcher.addEvent([this, fullscreen] {
+        @autoreleasepool {
+            if (!m_window) return;
+
             if (fullscreen) {
+                // Guardar la geometria de ventana para restaurarla al salir.
                 updateUnmaximizedCoords();
+                NSRect frame = [m_window frame];
+                m_savedFrameX = frame.origin.x;
+                m_savedFrameY = frame.origin.y;
+                m_savedFrameW = frame.size.width;
+                m_savedFrameH = frame.size.height;
+                m_savedStyleMask = static_cast<unsigned long>([m_window styleMask]);
+                m_savedWindowLevel = static_cast<long>([m_window level]);
+                m_fullscreenStateSaved = true;
+
+                NSScreen* screen = [m_window screen];
+                if (!screen) screen = [NSScreen mainScreen];
+                NSRect screenFrame = [screen frame];
+
+                // Ocultar barra de menu y dock; subir el nivel por encima de la barra de
+                // menu para que su auto-revelado al tocar el borde superior no tape (ni
+                // robe el mouse de) la fila superior del juego.
+                [NSApp setPresentationOptions:NSApplicationPresentationAutoHideMenuBar |
+                                              NSApplicationPresentationAutoHideDock];
+                [m_window setStyleMask:NSWindowStyleMaskBorderless];
+                [m_window setLevel:NSStatusWindowLevel];
+                [m_window setFrame:screenFrame display:YES];
+                [m_window makeFirstResponder:m_glView];
+                [m_window makeKeyAndOrderFront:nil];
+            } else {
+                // Restaurar barra de menu / dock y la geometria de ventana previa.
+                [NSApp setPresentationOptions:NSApplicationPresentationDefault];
+
+                if (m_fullscreenStateSaved) {
+                    [m_window setStyleMask:static_cast<NSUInteger>(m_savedStyleMask)];
+                    [m_window setLevel:static_cast<NSInteger>(m_savedWindowLevel)];
+                    NSRect frame = NSMakeRect(m_savedFrameX, m_savedFrameY,
+                                              m_savedFrameW, m_savedFrameH);
+                    [m_window setFrame:frame display:YES];
+                } else {
+                    // Sin estado guardado (no deberia pasar): reconstruir ventana titled.
+                    [m_window setStyleMask:NSWindowStyleMaskTitled |
+                                           NSWindowStyleMaskClosable |
+                                           NSWindowStyleMaskMiniaturizable |
+                                           NSWindowStyleMaskResizable];
+                    [m_window setLevel:NSNormalWindowLevel];
+                }
+                [m_window makeFirstResponder:m_glView];
+                [m_window makeKeyAndOrderFront:nil];
             }
-            [m_window toggleFullScreen:nil];
-            m_fullscreen = fullscreen;
+
+            // Sincronizar el tamano del render con el content view REAL resultante
+            // (borderless => content view = frame completo = 956 en fullscreen; ventana
+            // => su content rect). Red de seguridad por si windowDidResize no dispara con
+            // estas dimensiones; llamarlo de mas con el mismo tamano es inocuo.
+            NSRect contentRect = [[m_window contentView] frame];
+            handleResize(static_cast<int>(contentRect.size.width),
+                         static_cast<int>(contentRect.size.height));
         }
-    }
+    });
 }
 
 void CocoaWindow::setVerticalSync(bool enable)

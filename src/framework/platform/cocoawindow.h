@@ -293,4 +293,17 @@ private:
 
     unsigned int m_lastModifiers;
     std::array<bool, Fw::KeyLast> m_commandKeyDown{};
+
+    // Estado de ventana guardado para restaurar al salir del fullscreen sin bordes
+    // (Opcion A del fix de descalibracion del cursor en Macs con notch). No se usan
+    // tipos de Cocoa (NSRect/NSUInteger/NSInteger) aqui porque este header tambien se
+    // compila desde traduccion no-ObjC (rama #else con typedef void); se guardan como
+    // primitivos y se reconstruyen en el .mm.
+    bool m_fullscreenStateSaved{ false };
+    unsigned long m_savedStyleMask{ 0 };
+    long m_savedWindowLevel{ 0 };
+    double m_savedFrameX{ 0.0 };
+    double m_savedFrameY{ 0.0 };
+    double m_savedFrameW{ 0.0 };
+    double m_savedFrameH{ 0.0 };
 };
