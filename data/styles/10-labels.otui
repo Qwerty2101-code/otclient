@@ -1,12 +1,10 @@
 Label < UILabel
-  font: verdana-11px-antialised
   color: #dfdfdf
 
   $disabled:
     color: #dfdfdf88
 
 FlatLabel < UILabel
-  font: verdana-11px-antialised
   color: #dfdfdf
   size: 86 20
   text-offset: 3 3
@@ -19,5 +17,4 @@ FlatLabel < UILabel
 MenuLabel < Label
 
 GameLabel < UILabel
-  font: verdana-11px-antialised
   color: #dfdfdf

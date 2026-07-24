@@ -1,5 +1,4 @@
 Window < UIWindow
-  font: verdana-11px-antialised
   size: 200 200
   opacity: 1
   color: #dfdfdf
@@ -188,7 +187,6 @@ WindowPanel < Panel
   image-border-top: 17
 
 TransparentWindow < UIWindow
-  font: verdana-11px-antialised
   size: 200 200
   color: #8f8f8f
   text-offset: 0 2

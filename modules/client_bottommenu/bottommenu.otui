@@ -64,7 +64,6 @@ Panel
     Label
       id: showOffWindowText
       !text: tr('Random Hint')
-      font: verdana-11px-antialised
       text-offset: 0 2
       text-align: top
       anchors.top: parent.top
@@ -84,7 +83,6 @@ Panel
 
     Label
       !text: tr('Event Schedule')
-      font: verdana-11px-antialised
       text-offset: 0 2
       text-align: top
       anchors.top: parent.top
@@ -146,7 +144,6 @@ Panel
 
     Label
       !text: tr('Boosted')
-      font: verdana-11px-antialised
       text-offset: 0 2
       text-align: top
       anchors.top: parent.top

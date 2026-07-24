@@ -1,5 +1,4 @@
 Window < UIWindow
-  font: verdana-11px-antialised
   size: 200 200
   opacity: 1
   color: #dfdfdf
@@ -27,7 +26,6 @@ AcceptWindow < Window
   anchors.centerIn: parent
 
 ButtonShop < UIButton
-  font: verdana-11px-antialised
   color: #dfdfdfff
   size: 92 22
   text-offset: 0 0

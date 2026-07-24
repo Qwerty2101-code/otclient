@@ -9,7 +9,6 @@ StoreWindow
     id: transferPointsLabel
     !text: tr('Gift Tibia Coins')
     text-align: center
-    font: verdana-11px-antialised
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right

@@ -71,21 +71,9 @@ function init()
 
     installLocales('/locales')
 
-    local userLocaleName = g_settings.get('locale', 'false')
-    if userLocaleName ~= 'false' and setLocale(userLocaleName) then
-        pdebug('Using configured locale: ' .. userLocaleName)
-    else
-        setLocale(defaultLocaleName)
-        if g_app.hasUpdater() then
-            connect(g_app, {
-                onUpdateFinished = createWindow,
-            })
-        else
-            connect(g_app, {
-                onRun = createWindow,
-            })
-        end
-    end
+    -- Duelfall: cliente solo-inglés (CLAUDE.md §8: el jugador nunca ve otro idioma).
+    -- Se ignora cualquier locale guardado y no se muestra el selector de idioma.
+    setLocale(defaultLocaleName)
 
     ProtocolGame.registerExtendedOpcode(ExtendedIds.Locale, onExtendedLocales)
     connect(g_game, {
@@ -98,15 +86,6 @@ function terminate()
     currentLocale = nil
 
     ProtocolGame.unregisterExtendedOpcode(ExtendedIds.Locale)
-    if g_app.hasUpdater() then
-        disconnect(g_app, {
-            onUpdateFinished = createWindow,
-        })
-    else
-        disconnect(g_app, {
-            onRun = createWindow,
-        })
-    end
     disconnect(g_game, {
         onGameStart = onGameStart
     })

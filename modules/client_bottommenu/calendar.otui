@@ -3,7 +3,6 @@ CalendarGrid < MiniQtWindow
 
   Label
     !text: tr('Event Schedule')
-    font: verdana-11px-antialised
     text-offset: 0 2
     text-align: top
     anchors.top: parent.top

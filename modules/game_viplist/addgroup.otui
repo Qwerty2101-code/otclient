@@ -13,7 +13,6 @@ FloatingInputWindow
     id: headerLabel
     !text: tr('Add VIP Group')
     text-align: center
-    font: verdana-11px-antialised
     color: #909090
     anchors.top: parent.top
     anchors.left: parent.left

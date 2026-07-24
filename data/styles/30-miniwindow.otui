@@ -1,5 +1,4 @@
 MiniWindow < UIMiniWindow
-  font: verdana-11px-antialised
   width: 192
   height: 200
   image-source: /images/ui/miniwindow_body
@@ -343,7 +342,6 @@ PhantomMiniWindow < UIMiniWindow
 
 FloatingInputWindow < UIWindow
   anchors.centerIn: parent
-  font: verdana-11px-antialised
   size: 200 200
   opacity: 1
   color: #dfdfdf

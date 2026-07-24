@@ -7,7 +7,6 @@ MainWindow
 
   Label
     id: info
-    font: verdana-11px-monochrome
     color: #c0c0c0
     text: Enter a name for the new preset:
   
@@ -16,7 +15,6 @@ MainWindow
     margin-top: 3
     height: 16
     padding: 1 4
-    font: verdana-11px-monochrome
     color: #c0c0c0
 
   HorizontalSeparator
