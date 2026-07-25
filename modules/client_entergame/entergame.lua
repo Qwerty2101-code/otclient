@@ -84,9 +84,9 @@ local function onCharacterList(protocol, characters, account, otui)
 
         ServerList.setServerAccount(G.host, G.account)
         ServerList.setServerPassword(G.host, G.password)
-        ServerList.setServerAutologin(G.host, enterGame:getChildById('autoLoginBox'):isChecked())
-
-        g_settings.set('autologin', enterGame:getChildById('autoLoginBox'):isChecked())
+        -- Auto-login desactivado: no guardar
+        -- ServerList.setServerAutologin(G.host, enterGame:getChildById('autoLoginBox'):isChecked())
+        -- g_settings.set('autologin', enterGame:getChildById('autoLoginBox'):isChecked())
         ServerList.save()
     else
         -- reset server list account/password
@@ -146,7 +146,7 @@ end
 
 local function updateLabelText()
     if enterGame:getChildById('clientComboBox') and tonumber(enterGame:getChildById('clientComboBox'):getText()) > 1080 then
-        enterGame:setText("Journey Onwards")
+        enterGame:setText("L O G I N")
         enterGame:getChildById('emailLabel'):setText("Email:")
         enterGame:getChildById('rememberEmailBox'):setText("Remember Email:")
     else
@@ -164,9 +164,101 @@ local function loadServerListModule()
     end
 end
 
+-- Skin Duelfall del panel de login — tema HEXTECH (decision de Luis 2026-07-25
+-- noche: tinta marino + marcos ORO + CTA cian). Tarjeta = arte horneado del mod
+-- duel_skin (panel chaflanado con doble marco); boton = CTA cian con bisel +
+-- hover. Los TTF viven en mods/fonts/ttf y los assets en mods/duel_skin/img
+-- (capas Duelfall; el submodulo solo lleva este applier).
+local function applyDuelfallSkin()
+    local INTER4 = '/fonts/ttf/inter400.ttf'
+    local SAIRA6 = '/fonts/ttf/saira600.ttf'
+    local SAIRA7 = '/fonts/ttf/saira700.ttf'
+    local IMG = '/duel_skin/img/'
+    -- abyss previos: TXT #e8eef7, MUTE #8194b0, GOLD_TXT #cde2ff, BORDER #2a3448
+    local TXT, MUTE, GOLD_TXT = '#f0e6d2', '#a09b8c', '#f0e6d2'
+    local BORDER = '#5a4823'
+
+    enterGame:setImageSource(IMG .. 'panel_330x206.png')
+    enterGame:setBackgroundColor('alpha')
+    enterGame:setBorderWidth(0)
+    enterGame:setTTFFont(SAIRA7, 14, 1, '#000000')
+    enterGame:setColor(GOLD_TXT)
+
+    -- divisor ornamental bajo el titulo (padding de MainWindow desplaza hijos)
+    if not enterGame:getChildById('duelfallLoginDivider') then
+        local dv = g_ui.createWidget('UIWidget', enterGame)
+        dv:setId('duelfallLoginDivider')
+        dv:addAnchor(AnchorTop, 'parent', AnchorTop)
+        dv:addAnchor(AnchorHorizontalCenter, 'parent', AnchorHorizontalCenter)
+        dv:setMarginTop(-10)
+        dv:setWidth(220)
+        dv:setHeight(12)
+        dv:setImageSource(IMG .. 'divider_220.png')
+        dv:setPhantom(true)
+    end
+
+    for _, id in ipairs({ 'emailLabel', 'passwordLabel' }) do
+        local w = enterGame:getChildById(id)
+        if w then
+            w:setTTFFont(INTER4, 13, 0, '#000000')
+            w:setColor(TXT)
+            w:setWidth(74)   -- Inter 13 es mas ancha que el bitmap: "Password:" se recortaba
+            w:setHeight(18)  -- y mas alta: con los 14px del label la E perdia la barra inferior
+        end
+    end
+    for _, id in ipairs({ 'accountNameTextEdit', 'accountPasswordTextEdit' }) do
+        local w = enterGame:getChildById(id)
+        if w then
+            w:setTTFFont(INTER4, 13, 0, '#000000')
+            w:setColor(TXT)
+            w:setImageSource('')
+            w:setBackgroundColor('#010a13')
+            w:setBorderWidth(1)
+            w:setBorderColor(BORDER)
+            w:setHeight(24)
+            w:setPaddingLeft(8)
+        end
+    end
+    local remember = enterGame:getChildById('rememberEmailBox')
+    if remember then
+        remember:setTTFFont(INTER4, 12, 0, '#000000')
+        remember:setColor(MUTE)
+    end
+    local link = enterGame:getChildById('websiteLink')
+    if link then
+        link:setTTFFont(INTER4, 12, 0, '#000000')
+        link:setColor('#3ec8ba')  -- cian hextech: el link es accion (magia); abyss: #7fb2ff
+    end
+    local btn = enterGame:getChildById('loginButton')
+    if btn then
+        -- GOTCHA estilo Button upstream: clipea 43x20 de su atlas -> fijar clip
+        -- al tamano del arte en cada cambio de estado (el estilo lo pisa)
+        local function fixBtn(src)
+            btn:setImageSource(IMG .. src)
+            btn:setImageClip({ x = 0, y = 0, width = 112, height = 28 })
+            btn:setImageBorder(0)
+        end
+        btn:setBackgroundColor('alpha')
+        btn:setBorderWidth(0)
+        btn:setTTFFont(SAIRA6, 12, 0, '#000000')
+        btn:setColor('#04262a')
+        btn:setWidth(112)
+        btn:setHeight(28)
+        fixBtn('btn_primary_112x28.png')
+        btn.onHoverChange = function(_, hovered)
+            fixBtn(hovered and 'btn_primary_112x28_hover.png' or 'btn_primary_112x28.png')
+        end
+    end
+    -- aire entre filas (los edits ahora son mas altos que la fila original)
+    local pw = enterGame:getChildById('passwordLabel')
+    if pw then pw:setMarginTop(18) end
+    if remember then remember:setMarginTop(14) end
+end
+
 -- public functions
 function EnterGame.init()
     enterGame = g_ui.displayUI('entergame')
+    applyDuelfallSkin()
     Keybind.new("Misc.", "Change Character", "Ctrl+G", "")
     Keybind.bind("Misc.", "Change Character", {
       {
@@ -202,7 +294,8 @@ function EnterGame.init()
         enterGame:getChildById('rememberEmailBox'):setChecked(false)
     end
     
-    enterGame:getChildById('autoLoginBox'):setChecked(serverData.autologin == true)
+    -- Auto-login siempre desactivado
+    enterGame:getChildById('autoLoginBox'):setChecked(false)
     enterGame:getChildById('serverHostTextEdit'):setText(host)
     enterGame:getChildById('serverPortTextEdit'):setText(port)
     enterGame:getChildById('stayLoggedBox'):setChecked(stayLogged)
@@ -256,7 +349,8 @@ function EnterGame.init()
             if checked and #account > 0 then
                 ServerList.setServerAccount(host, account)
                 ServerList.setServerPassword(host, password)
-                ServerList.setServerAutologin(host, enterGame:getChildById('autoLoginBox'):isChecked() or false)
+                -- Auto-login desactivado
+            -- ServerList.setServerAutologin(host, enterGame:getChildById('autoLoginBox'):isChecked() or false)
                 g_settings.set('host', host)
             else
                 ServerList.setServerAccount(host, '')
@@ -274,7 +368,10 @@ function EnterGame.init()
         enterGame.disableToken = not (server and server.useAuthenticator)
         if table.size(Servers_init) == 1 then
             local hostInit, valuesInit = next(Servers_init)
-            EnterGame.setUniqueServer(hostInit, valuesInit.port, valuesInit.protocol)
+            -- Duelfall: 300x190 (el default 380x229 asume auto-login visible y los
+            -- margenes muertos; el extra sobre 165 es la fila del link Visit website)
+            -- margenes muertos de los campos ocultos; aqui todo eso queda en cero)
+            EnterGame.setUniqueServer(hostInit, valuesInit.port, valuesInit.protocol, 330, 206)
             EnterGame.setHttpLogin(valuesInit.httpLogin)
         elseif not host or host == "" then
             local hostInit, valuesInit = next(Servers_init)
@@ -325,22 +422,9 @@ function EnterGame.showServerList()
 end
 
 function EnterGame.firstShow()
+    -- Auto-login COMPLETAMENTE DESACTIVADO (2026-07-24)
+    -- El usuario DEBE hacer login manualmente cada vez
     EnterGame.show()
-
-    local host = g_settings.get('host')
-    local servers = g_settings.getNode('ServerList') or {}
-    local serverData = servers[host] or {}
-    local account = safeDecrypt(serverData.account)
-    local password = safeDecrypt(serverData.password)
-    local autologin = serverData.autologin == true
-    if #host > 0 and #password > 0 and #account > 0 and autologin then
-        addEvent(function()
-            if not g_settings.getBoolean('autologin') then
-                return
-            end
-            EnterGame.doLogin()
-        end)
-    end
 
     if Services and Services.status then
         if g_modules.getModule("client_bottommenu"):isLoaded()  then
@@ -921,10 +1005,44 @@ function EnterGame.setUniqueServer(host, port, protocol, windowWidth, windowHeig
     httpLoginBox:setVisible(false)
     httpLoginBox:setHeight(0)
 
+    -- Duelfall: auto-login esta desactivado por completo (bug hunt 2026-07-24);
+    -- el checkbox sobra en el formulario minimo. Solo se oculta (el handler de
+    -- rememberEmailBox en el .otui lo referencia por id: destruirlo = nil error).
+    local autoLoginBox = enterGame:getChildById('autoLoginBox')
+    autoLoginBox:setVisible(false)
+    autoLoginBox:setHeight(0)
+
     local serverListButton = enterGame:getChildById('serverListButton')
     serverListButton:setVisible(false)
     serverListButton:setHeight(0)
     serverListButton:setWidth(0)
+
+    -- Duelfall: altura 0 no basta — los MARGENES de los campos ocultos siguen
+    -- sumando en la cadena de anclas (~50px de hueco entre Remember y Login).
+    -- Margen 0 a todo lo oculto + separador del bloque server + residuales
+    -- (Forgot sin Services.websites y stayLogged van ocultos pero ocupan rect).
+    local serverSeparator = enterGame:getChildById('serverSeparator')
+    if serverSeparator then
+        serverSeparator:setVisible(false)
+        serverSeparator:setHeight(0)
+        serverSeparator:setMarginTop(0)
+    end
+    for _, wid in ipairs({ 'serverLabel', 'serverHostTextEdit', 'serverListButton',
+                           'clientLabel', 'clientComboBox', 'portLabel',
+                           'serverPortTextEdit', 'autoLoginBox', 'httpLoginBox' }) do
+        local w = enterGame:getChildById(wid)
+        if w then w:setMarginTop(0) end
+    end
+    for _, wid in ipairs({ 'Forgot_password_email', 'stayLoggedBox' }) do
+        local w = enterGame:getChildById(wid)
+        if w then
+            w:setHeight(0)
+            w:setMarginTop(0)
+        end
+    end
+    -- stayLogged (altura 0) queda como espaciador: sin esto el separador de abajo
+    -- pisa el texto del checkbox Remember (visto en captura 2026-07-24)
+    enterGame:getChildById('stayLoggedBox'):setMarginTop(10)
 
     local rememberEmailBox = enterGame:getChildById('rememberEmailBox')
     rememberEmailBox:setMarginTop(5)

@@ -13,7 +13,9 @@ Module
     - client_styles
     - client_locales
     - client_topmenu
-    - client_bottommenu
+    // client_bottommenu fuera (Duelfall 2026-07-24): paneles Event Schedule /
+    // Boosted / showOff + logo "OTClient Redemption" del login; todo es chrome
+    // Tibia-RL sin webservice. entergame guarda sus llamadas con isLoaded().
     - client_background
     - client_options
     - client_entergame

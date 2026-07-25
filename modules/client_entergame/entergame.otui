@@ -120,6 +120,7 @@ EnterGameWindow
       margin-top: 8
 
   HorizontalSeparator
+    id: serverSeparator
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: prev.bottom
@@ -214,8 +215,9 @@ EnterGameWindow
     margin-top: 6
 
   QtButton
+    id: loginButton
     !text: tr('Login')
-    anchors.right: parent.right
+    anchors.horizontalCenter: parent.horizontalCenter
     anchors.top: prev.bottom
     margin-top: 9
     size: 86 20
@@ -247,3 +249,36 @@ EnterGameWindow
     margin-top: 5
     color: green
     text-auto-resize: true
+
+  UIButton
+    id: websiteLink
+    !text: tr('Visit website')
+    font: verdana-11px-monochrome
+    text-align: center
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.top: loginButton.bottom
+    margin-top: 8
+    width: 120
+    opacity: 0.8
+    @onClick: g_platform.openUrl(Services.websites)
+    @onSetup: |
+      if Services and Services.websites then
+        self:setVisible(true)
+      else
+        self:setVisible(false)
+      end
+
+  UIWidget
+    id: websiteLinkUnderline
+    phantom: true
+    background-color: #3ec8ba
+    opacity: 0.55
+    anchors.horizontalCenter: websiteLink.horizontalCenter
+    anchors.top: websiteLink.bottom
+    margin-top: -2
+    width: 84
+    height: 1
+    @onSetup: |
+      if not (Services and Services.websites) then
+        self:setVisible(false)
+      end
