@@ -5,12 +5,18 @@
 Services = {
     --updater = "http://localhost/api/updater.php", --./updater
     --status = "http://localhost/login.php", --./client_entergame | ./client_topmenu
-    --websites = "http://localhost/?subtopic=accountmanagement", --./client_entergame "Forgot password and/or email"
+    -- Duelfall: web local MyAAC (dev). En produccion apuntar al dominio real.
+    -- Lo consume el link "Visit website" del login (entergame.otui websiteLink).
+    websites = "http://localhost:8090",
     --createAccount = "http://localhost/clientcreateaccount.php", --./client_entergame -- createAccount.lua
     --getCoinsUrl = "http://localhost/?subtopic=shop&step=terms", --./game_market
     clientAssets = {
         enabled = true,
-        repository = "dudantas/tibia-client",
+        -- Duelfall: canal de assets PROPIO (base 15.25 de dudantas/tibia-client +
+        -- outfits custom de la Cosmetic Forge inyectados). Release por tag
+        -- "15.25.duelfall.N"; el zip lo regenera la Forge en cada drop de
+        -- cosmeticos (ver docs/OUTFIT_INJECTION.md de la Forge).
+        repository = "Qwerty2101-code/duelfall-assets",
         installSounds = true,
         strictManifestSha256 = true,
         allowRawFallbackHashMismatch = false,
@@ -61,38 +67,15 @@ if ENABLE_SERVERS then
     -- Each entry defines port, protocol, and authentication options.
     -- @table Servers_init
     --
+    -- Duelfall: UNA sola entrada => entergame toma el camino setUniqueServer
+    -- (oculta server/version/puerto/HTTP y deja solo email+password+remember).
+    -- Con dos o mas entradas el formulario completo regresa.
     Servers_init = {
-
-        -- Local login server
-        ---
-        -- Configuration for local login server.
-        -- @class table
-        -- @name local_login
-        -- @field port Port used for HTTP connection
-        -- @field protocol Protocol identifier used by the application
-        -- @field httpLogin Enables HTTP-based login on the server
-        -- @field useAuthenticator Enables additional authentication layer
-        --
-        ["http://127.0.0.1/login.php"] = {
+        ["http://localhost:8088/login"] = {
             port = 80,
-            protocol = 1511,
+            protocol = 1525,
             httpLogin = true,
             useAuthenticator = false
-        },
-
-        -- External server
-        ---
-        -- Configuration for external server ip.net.
-        -- @class table
-        -- @name ip_net
-        -- @field port TCP port used for connection
-        -- @field protocol Protocol identifier used by the server
-        -- @field httpLogin Indicates if the server allows HTTP login
-        --
-        ["ip.net"] = {
-            port = 7171,
-            protocol = 860,
-            httpLogin = false
         }
     }
 end
