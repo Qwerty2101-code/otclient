@@ -249,16 +249,26 @@ void CocoaWindow::internalCreateWindow()
     [m_delegate setPlatformWindow:this];
     [m_window setDelegate:m_delegate];
 
+    // HiDPI (Retina): el motor trabaja con m_size en PIXELES FISICOS y deriva la UI
+    // logica dividiendo entre la densidad (graphicalapplication.cpp:337 ->
+    // g_ui.resize(size / scale)). AppKit, en cambio, habla en PUNTOS. Fijamos la
+    // densidad aqui y guardamos m_size ya convertido a pixeles; cada llamada a AppKit
+    // vuelve a dividir. Sin esto la densidad se queda en 1 y el cliente dibuja a la
+    // mitad de la resolucion del panel, con el compositor estirando el resultado.
+    const CGFloat backing = [m_window backingScaleFactor];
+    setDisplayDensity(static_cast<float>(backing));
+
     NSRect contentRect = [[m_window contentView] frame];
-    m_size = Size(static_cast<int>(contentRect.size.width),
-                  static_cast<int>(contentRect.size.height));
+    m_size = Size(static_cast<int>(contentRect.size.width * backing),
+                  static_cast<int>(contentRect.size.height * backing));
 
     NSRect windowFrame = [m_window frame];
     NSScreen* screen = [m_window screen];
     if (screen) {
+        // m_position tambien en PIXELES fisicos (misma convencion que m_size).
         NSRect screenFrame = [screen frame];
-        m_position = Point(static_cast<int>(windowFrame.origin.x),
-                           static_cast<int>(screenFrame.size.height - windowFrame.origin.y - windowFrame.size.height));
+        m_position = Point(static_cast<int>(windowFrame.origin.x * backing),
+                           static_cast<int>((screenFrame.size.height - windowFrame.origin.y - windowFrame.size.height) * backing));
     }
 }
 
@@ -281,15 +291,21 @@ void CocoaWindow::internalCreateGLContext()
         return;
     }
 
-    int width = m_size.width();
-    int height = m_size.height();
+    // m_size esta en PIXELES; AppKit quiere PUNTOS -> dividir entre la densidad.
+    const float density = getDisplayDensity();
+    const int width = static_cast<int>(m_size.width() / density);
+    const int height = static_cast<int>(m_size.height() / density);
     NSRect viewFrame = NSMakeRect(0, 0, width, height);
 
-    g_logger.info("Creating GL view with frame: {}x{}", width, height);
+    g_logger.info("Creating GL view: {}x{} pt @{}x = {}x{} px",
+                  width, height, density, m_size.width(), m_size.height());
 
     m_glView = [[OTOpenGLView alloc] initWithFrame:viewFrame pixelFormat:pixelFormat];
     [m_glView setPlatformWindow:this];
-    [m_glView setWantsBestResolutionOpenGLSurface:NO];
+    // YES = la superficie GL se crea a resolucion NATIVA del panel (Retina) en vez de
+    // a puntos logicos. Es la mejora de resolucion real: sin esto el juego se dibuja a
+    // 1/4 de los pixeles y macOS lo estira con filtrado bilineal (= se ve borroso).
+    [m_glView setWantsBestResolutionOpenGLSurface:YES];
     [m_glView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
 
     m_glContext = [m_glView openGLContext];
@@ -344,9 +360,11 @@ void CocoaWindow::move(const Point& pos)
         if (!screen) screen = [NSScreen mainScreen];
         NSRect screenFrame = [screen frame];
 
+        // pos llega en PIXELES fisicos (convencion de la API); AppKit quiere PUNTOS.
+        const float density = getDisplayDensity();
         NSRect frame = [m_window frame];
-        frame.origin.x = pos.x;
-        frame.origin.y = screenFrame.size.height - pos.y - frame.size.height;
+        frame.origin.x = pos.x / density;
+        frame.origin.y = screenFrame.size.height - (pos.y / density) - frame.size.height;
 
         [m_window setFrame:frame display:YES];
     }
@@ -357,12 +375,14 @@ void CocoaWindow::resize(const Size& size)
     @autoreleasepool {
         if (!m_window) return;
 
+        // size llega en PIXELES fisicos; el frame de AppKit va en PUNTOS.
+        const float density = getDisplayDensity();
         NSRect frame = [m_window frame];
         NSRect contentRect = [m_window contentRectForFrameRect:frame];
         CGFloat titleBarHeight = frame.size.height - contentRect.size.height;
 
-        frame.size.width = size.width();
-        frame.size.height = size.height() + titleBarHeight;
+        frame.size.width = size.width() / density;
+        frame.size.height = (size.height() / density) + titleBarHeight;
 
         [m_window setFrame:frame display:YES];
     }
@@ -496,9 +516,12 @@ void CocoaWindow::setTitle(std::string_view title)
 void CocoaWindow::setMinimumSize(const Size& minimumSize)
 {
     @autoreleasepool {
+        // minimumSize llega en PIXELES fisicos; setMinSize de AppKit va en PUNTOS.
         m_minimumSize = minimumSize;
         if (m_window) {
-            [m_window setMinSize:NSMakeSize(minimumSize.width(), minimumSize.height())];
+            const float density = getDisplayDensity();
+            [m_window setMinSize:NSMakeSize(minimumSize.width() / density,
+                                            minimumSize.height() / density)];
         }
     }
 }
@@ -656,9 +679,13 @@ void CocoaWindow::setClipboardText(std::string_view text)
 Size CocoaWindow::getDisplaySize()
 {
     @autoreleasepool {
+        // En PIXELES fisicos, coherente con m_size y con lo que startup.lua trata como
+        // 'physical-v1'. [screen frame] viene en puntos.
         NSScreen* screen = [NSScreen mainScreen];
         NSRect frame = [screen frame];
-        return Size(static_cast<int>(frame.size.width), static_cast<int>(frame.size.height));
+        const CGFloat backing = [screen backingScaleFactor];
+        return Size(static_cast<int>(frame.size.width * backing),
+                    static_cast<int>(frame.size.height * backing));
     }
 }
 
@@ -853,7 +880,14 @@ void CocoaWindow::handleMouseScroll(int deltaX, int deltaY)
 
 void CocoaWindow::handleResize(int width, int height)
 {
-    m_size = Size(width, height);
+    // Los dos llamadores pasan el contentRect en PUNTOS. Re-leemos la densidad en cada
+    // resize a proposito: al arrastrar la ventana entre un monitor Retina y uno normal
+    // el backingScaleFactor cambia, y el viewport tiene que seguirlo.
+    if (m_window) {
+        setDisplayDensity(static_cast<float>([m_window backingScaleFactor]));
+    }
+    const float density = getDisplayDensity();
+    m_size = Size(static_cast<int>(width * density), static_cast<int>(height * density));
 
     if (m_glContext) {
         [m_glContext update];
@@ -865,7 +899,9 @@ void CocoaWindow::handleResize(int width, int height)
 
 void CocoaWindow::handleMove(int x, int y)
 {
-    m_position = Point(x, y);
+    // El llamador pasa PUNTOS; m_position va en PIXELES fisicos.
+    const float density = getDisplayDensity();
+    m_position = Point(static_cast<int>(x * density), static_cast<int>(y * density));
     updateUnmaximizedCoords();
 }
 

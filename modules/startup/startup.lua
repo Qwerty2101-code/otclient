@@ -5,16 +5,24 @@ function init()
 
     local platformType = g_window.getPlatformType()
     local isX11 = type(platformType) == 'string' and platformType:find('X11', 1, true) == 1
-    local density = (isX11 and g_window.getDisplayDensity()) or 1
+    -- Cocoa entra al mismo espacio de metricas FISICO que X11 (Duelfall 2026-07-26):
+    -- desde que el backend de macOS pide superficie Retina nativa, la geometria de
+    -- g_window (size/pos/displaySize) esta en pixeles fisicos, no en puntos.
+    local isCocoa = type(platformType) == 'string' and platformType:find('COCOA', 1, true) == 1
+    local isPhysicalMetrics = isX11 or isCocoa
+    local density = (isPhysicalMetrics and g_window.getDisplayDensity()) or 1
     local displaySize = g_window.getDisplaySize()
     local metricsSpace = g_settings.getString('window-metrics-space', '')
-    local shouldScaleLegacySavedMetrics = isX11 and density ~= 1 and metricsSpace ~= 'physical-v1'
+    local shouldScaleLegacySavedMetrics = isPhysicalMetrics and density ~= 1 and
+                                              metricsSpace ~= 'physical-v1'
 
     if g_platform.isMobile() then
         g_window.setMinimumSize({ width = 640, height = 360 })
     else
-        local minSize = { width = 1020, height = 644 }
-        if isX11 then
+        -- El minimo esta expresado en unidades de UI; en espacio fisico hay que
+        -- escalarlo por la densidad para que la ventana minima se vea igual de grande.
+        local minSize = { width = 1020 * density, height = 644 * density }
+        if isPhysicalMetrics then
             minSize.width = math.max(1, math.min(minSize.width, displaySize.width))
             minSize.height = math.max(1, math.min(minSize.height, displaySize.height))
         end
@@ -23,7 +31,9 @@ function init()
 
     -- window size
     local hasSavedWindowSize = g_settings.exists('window-size')
-    local size = { width = 1020, height = 644 }
+    -- El default tambien va en espacio fisico: sin escalarlo, el primer arranque en
+    -- una pantalla Retina abriria una ventana de la mitad del tamano esperado.
+    local size = { width = 1020 * density, height = 644 * density }
     size = g_settings.getSize('window-size', size)
     if shouldScaleLegacySavedMetrics and hasSavedWindowSize then
         size = {
@@ -32,7 +42,7 @@ function init()
         }
     end
 
-    if isX11 then
+    if isPhysicalMetrics then
         size.width = math.max(1, math.min(size.width, displaySize.width))
         size.height = math.max(1, math.min(size.height, displaySize.height))
     end
@@ -46,6 +56,13 @@ function init()
     local pos = defaultPos
     if not isX11 then
         pos = g_settings.getPoint('window-pos', defaultPos)
+        -- Una posicion guardada por una version previa esta en puntos: migrarla.
+        if shouldScaleLegacySavedMetrics and g_settings.exists('window-pos') then
+            pos = {
+                x = math.floor((pos.x * density) + 0.5),
+                y = math.floor((pos.y * density) + 0.5)
+            }
+        end
     end
     if isX11 then
         local maxX = math.max(displaySize.width - size.width, 0)
@@ -82,6 +99,7 @@ function terminate()
 
     local platformType = g_window.getPlatformType()
     local isX11 = type(platformType) == 'string' and platformType:find('X11', 1, true) == 1
+    local isCocoa = type(platformType) == 'string' and platformType:find('COCOA', 1, true) == 1
 
     -- save window configs
     local windowSize = g_window.getUnmaximizedSize()
@@ -94,7 +112,13 @@ function terminate()
         g_settings.set('window-metrics-space', 'physical-v1')
     else
         g_settings.set('window-pos', windowPos)
-        g_settings.remove('window-metrics-space')
+        if isCocoa then
+            -- Cocoa guarda en espacio fisico igual que X11, pero SI persiste la
+            -- posicion (el workaround de arriba es especifico de X11).
+            g_settings.set('window-metrics-space', 'physical-v1')
+        else
+            g_settings.remove('window-metrics-space')
+        end
     end
     g_settings.set('window-maximized', g_window.isMaximized())
     g_settings.save()
