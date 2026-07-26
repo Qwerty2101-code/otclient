@@ -99,13 +99,21 @@ public:
     int getDisplayWidth() { return getDisplaySize().width(); }
     int getDisplayHeight() { return getDisplaySize().height(); }
     float getDisplayDensity() { return m_displayDensity; }
-    void setDisplayDensity(const float v) { 
+    void setDisplayDensity(const float v) {
         if (m_displayDensity == v) {
             return;
         }
-        m_displayDensity = v; 
+        m_displayDensity = v;
         onDisplayDensityChanged(v);
     }
+
+    // Densidad del HARDWARE (backing scale del panel), separada de m_displayDensity.
+    // m_displayDensity = m_hardwareDensity * hudScale: la primera es propiedad de la
+    // pantalla, la segunda preferencia del usuario. Antes eran la MISMA variable, asi que
+    // el hudScale por defecto (1) pisaba la densidad Retina detectada por el backend y la
+    // UI quedaba nitida pero a la mitad de tamano. Ver GraphicalApplication::setHUDScale.
+    float getHardwareDensity() const { return m_hardwareDensity; }
+    void setHardwareDensity(const float v) { m_hardwareDensity = v > 0.f ? v : 1.f; }
 
     Size getUnmaximizedSize() { return m_unmaximizedSize; }
     Size getSize() { return m_size; }
@@ -170,6 +178,7 @@ protected:
     bool m_maximized{ false };
     bool m_vsync{ false };
     float m_displayDensity{ DEFAULT_DISPLAY_DENSITY };
+    float m_hardwareDensity{ 1.f };
 
     std::function<void()> m_onClose;
     OnResizeCallback m_onResize;

@@ -256,7 +256,8 @@ void CocoaWindow::internalCreateWindow()
     // vuelve a dividir. Sin esto la densidad se queda en 1 y el cliente dibuja a la
     // mitad de la resolucion del panel, con el compositor estirando el resultado.
     const CGFloat backing = [m_window backingScaleFactor];
-    setDisplayDensity(static_cast<float>(backing));
+    setHardwareDensity(static_cast<float>(backing));
+    setDisplayDensity(static_cast<float>(backing));  // hudScale=1 al arrancar
 
     NSRect contentRect = [[m_window contentView] frame];
     m_size = Size(static_cast<int>(contentRect.size.width * backing),
@@ -884,7 +885,12 @@ void CocoaWindow::handleResize(int width, int height)
     // resize a proposito: al arrastrar la ventana entre un monitor Retina y uno normal
     // el backingScaleFactor cambia, y el viewport tiene que seguirlo.
     if (m_window) {
-        setDisplayDensity(static_cast<float>([m_window backingScaleFactor]));
+        // Conserva el hudScale del usuario al recalcular por el panel nuevo. El hudScale
+        // vigente es la razon densidad/hardware ANTES de tocar nada (sin depender de g_app).
+        const float prevHw = getHardwareDensity();
+        const float hud = prevHw > 0.f ? (getDisplayDensity() / prevHw) : 1.f;
+        setHardwareDensity(static_cast<float>([m_window backingScaleFactor]));
+        setDisplayDensity(getHardwareDensity() * (hud > 0.f ? hud : 1.f));
     }
     const float density = getDisplayDensity();
     m_size = Size(static_cast<int>(width * density), static_cast<int>(height * density));

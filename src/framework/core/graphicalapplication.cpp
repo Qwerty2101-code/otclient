@@ -400,8 +400,14 @@ void GraphicalApplication::doMapScreenshot(std::string fileName)
     if (m_drawEvents) m_drawEvents->doMapScreenshot(fileName);
 }
 
-float GraphicalApplication::getHUDScale() const { return g_window.getDisplayDensity(); }
+// El hudScale es un MULTIPLICADOR sobre la densidad del hardware, no un reemplazo.
+// Antes esto hacia setDisplayDensity(v) a secas: en una pantalla Retina el hudScale por
+// defecto (1) pisaba la densidad 2 detectada por el backend, la UI se distribuia en
+// pixeles fisicos y quedaba nitida pero a la MITAD del tamano en pantalla.
+float GraphicalApplication::getHUDScale() const {
+    return g_window.getDisplayDensity() / g_window.getHardwareDensity();
+}
 void GraphicalApplication::setHUDScale(const float v) {
-    g_window.setDisplayDensity(v);
+    g_window.setDisplayDensity(g_window.getHardwareDensity() * v);
     resize(g_graphics.getViewportSize());
 }
