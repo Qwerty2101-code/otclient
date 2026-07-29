@@ -22,6 +22,19 @@ local keys = {
     { "Numpad7", NorthWest },
 }
 
+-- OJO EN macOS (verificado 2026-07-29): estas cuatro combinaciones son atajos DEL
+-- SISTEMA — Ctrl+Arriba = Mission Control, Ctrl+Abajo = ventanas de la app,
+-- Ctrl+Izq/Der = cambiar de escritorio — y el sistema las atiende ANTES que la app,
+-- tambien en pantalla completa. O sea que en Mac el giro puede no llegar nunca al
+-- cliente, y spamearlo dispara Mission Control en vez de girar.
+--
+-- Ademas: la cadena "Control" resuelve a KeyCtrlCmd (corelib/keyboard.lua), que en
+-- Mac es la tecla Ctrl FISICA; Cmd produce KeyMeta y por lo tanto **Cmd+flecha no
+-- gira**, no esta bindeado. Y WASD no esta bindeado en absoluto, ni para caminar
+-- (ver `keys`) ni para girar.
+--
+-- Cambiar esto es decision de producto (que modificador y si se agrega WASD), no un
+-- arreglo: queda anotado aqui para que el siguiente que lo lea no lo re-investigue.
 local turnKeys = {
     { "Control+Up",    North },
     { "Control+Right", East },
@@ -179,10 +192,13 @@ local function changeWalkDir(dir, pop)
 end
 
 --- Handles turning the player.
+--- Devuelve true si el giro se emitio de verdad, false si cayo dentro de la ventana
+--- de delay y se descarto. bindTurnKey usa el retorno para no penalizar un giro que
+--- nunca ocurrio (ver el bug del walk-lock ahi).
 local function turn(dir, repeated)
     local player = g_game.getLocalPlayer()
     if player:isWalking() and player:getDirection() == dir then
-        return
+        return false
     end
 
     cancelWalkEvent()
@@ -197,7 +213,9 @@ local function turn(dir, repeated)
         changeWalkDir(dir)
         lastTurn = g_clock.millis()
         player:lockWalk(g_settings.getNumber("walkTurnDelay"))
+        return true
     end
+    return false
 end
 
 --- Binds movement keys to their respective directions.
@@ -306,11 +324,33 @@ end
 function bindTurnKey(key, dir)
     local gameRootPanel = modules.game_interface.getRootPanel()
 
-    g_keyboard.bindKeyDown(key, function() turn(dir, false) end, gameRootPanel)
-    g_keyboard.bindKeyPress(key, function() turn(dir, true) end, gameRootPanel)
+    -- Se recuerda si el ULTIMO giro de esta tecla llego a emitirse, para no castigar
+    -- al jugador por un giro que el delay descarto (ver el keyUp).
+    local emitted = false
+
+    g_keyboard.bindKeyDown(key, function() emitted = turn(dir, false) or emitted end, gameRootPanel)
+    g_keyboard.bindKeyPress(key, function() emitted = turn(dir, true) or emitted end, gameRootPanel)
     g_keyboard.bindKeyUp(key, function()
+        -- DOS BUGS QUE HACIAN QUE SPAMEAR EL GIRO TRABARA AL PERSONAJE:
+        --
+        -- 1) FUGA EN smartWalkDirs. turn() empuja la direccion con changeWalkDir(dir)
+        --    pero aqui NUNCA se sacaba, mientras las teclas de caminar si equilibran
+        --    push/pop (bindWalkKey). Cada giro dejaba una direccion colgada; tras
+        --    spamear los cuatro sentidos la lista queda con las cuatro y smartWalkDir
+        --    se vuelve permanentemente ajeno a lo que pulsas. Como addWalkEvent camina
+        --    `smartWalkDir or dir`, a partir de ahi las flechas mueven al personaje en
+        --    la direccion FUGADA, y con smartWalk activo el mapa diagonal compone
+        --    sentidos que nadie pidio. Se saca aqui, igual que en bindWalkKey.
+        --
+        -- 2) WALK-LOCK POR CADA SOLTADA. Este lockWalk(200) corria SIEMPRE, incluso
+        --    cuando turn() habia descartado el giro por el delay. Al spamear, cada
+        --    soltada renovaba 200 ms de bloqueo, asi que el personaje quedaba
+        --    practicamente inmovil justo mientras mas se le insistia. Ahora solo se
+        --    bloquea si de verdad hubo giro que proteger.
+        changeWalkDir(dir, true)
         local player = g_game.getLocalPlayer()
-        if player then player:lockWalk(200) end
+        if player and emitted then player:lockWalk(200) end
+        emitted = false
     end, gameRootPanel)
 end
 
