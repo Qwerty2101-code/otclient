@@ -22,24 +22,42 @@ local keys = {
     { "Numpad7", NorthWest },
 }
 
--- OJO EN macOS (verificado 2026-07-29): estas cuatro combinaciones son atajos DEL
--- SISTEMA — Ctrl+Arriba = Mission Control, Ctrl+Abajo = ventanas de la app,
--- Ctrl+Izq/Der = cambiar de escritorio — y el sistema las atiende ANTES que la app,
--- tambien en pantalla completa. O sea que en Mac el giro puede no llegar nunca al
--- cliente, y spamearlo dispara Mission Control en vez de girar.
+-- POR QUE NO ES SOLO "Control+flecha" (bug reportado por Luis; causa verificada el
+-- 2026-07-29 y corregida el 2026-07-31).
 --
--- Ademas: la cadena "Control" resuelve a KeyCtrlCmd (corelib/keyboard.lua), que en
--- Mac es la tecla Ctrl FISICA; Cmd produce KeyMeta y por lo tanto **Cmd+flecha no
--- gira**, no esta bindeado. Y WASD no esta bindeado en absoluto, ni para caminar
--- (ver `keys`) ni para girar.
+-- En macOS las cuatro combinaciones Ctrl+flecha son atajos DEL SISTEMA —
+-- Ctrl+Arriba = Mission Control, Ctrl+Abajo = ventanas de la app, Ctrl+Izq/Der =
+-- cambiar de escritorio— y el sistema las atiende ANTES que la app, tambien en
+-- pantalla completa. O sea que el giro NO LLEGA al cliente, y spamearlo dispara
+-- Mission Control en vez de girar. No era un bug del codigo de giro (esos dos ya se
+-- arreglaron: la fuga de smartWalkDirs y el walk-lock, ver bindTurnKey); era que la
+-- tecla nunca llegaba.
 --
--- Cambiar esto es decision de producto (que modificador y si se agrega WASD), no un
--- arreglo: queda anotado aqui para que el siguiente que lo lea no lo re-investigue.
+-- Arreglo: se bindea el giro a modificadores que NINGUN sistema secuestra, sin
+-- perder el Ctrl+flecha clasico donde si funciona.
+--   * "Primary" -> Cmd en macOS, Ctrl en Windows/Linux (resolveKeyAlias,
+--     corelib/keyboard.lua:19-24). En Mac da Cmd+flecha, que el sistema NO se queda;
+--     en Windows/Linux es EXACTAMENTE el Ctrl+flecha de siempre, sin cambio.
+--   * "Alt" -> Option en macOS, Alt en el resto. Alternativa universal de respaldo,
+--     sin colision con otros bindings del cliente (verificado con grep sobre
+--     modules/: el unico Shift/Alt+flecha existente es Shift+Up en game_console).
+--
+-- NO se lista "Control" aparte a proposito: en Windows/Linux resolveKeyAlias lo
+-- mandaria a la MISMA combinacion que "Primary" y quedarian dos binds sobre la misma
+-- tecla (doble giro). En macOS "Control" es la tecla Ctrl fisica, que es justo la que
+-- el sistema intercepta — bindearla no aportaria nada.
+--
+-- Sigue sin bindearse WASD, ni para caminar (ver `keys`) ni para girar: eso si es
+-- decision de producto y no hace falta para que el giro funcione.
 local turnKeys = {
-    { "Control+Up",    North },
-    { "Control+Right", East },
-    { "Control+Down",  South },
-    { "Control+Left",  West },
+    { "Primary+Up",    North },
+    { "Primary+Right", East },
+    { "Primary+Down",  South },
+    { "Primary+Left",  West },
+    { "Alt+Up",        North },
+    { "Alt+Right",     East },
+    { "Alt+Down",      South },
+    { "Alt+Left",      West },
 }
 
 WalkController = Controller:new()
