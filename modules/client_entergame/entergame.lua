@@ -164,19 +164,22 @@ local function loadServerListModule()
     end
 end
 
--- Skin Duelfall del panel de login — tema HEXTECH (decision de Luis 2026-07-25
--- noche: tinta marino + marcos ORO + CTA cian). Tarjeta = arte horneado del mod
--- duel_skin (panel chaflanado con doble marco); boton = CTA cian con bisel +
--- hover. Los TTF viven en mods/fonts/ttf y los assets en mods/duel_skin/img
+-- Skin Duelfall del panel de login — tema CYBER-ARCANO (D-018, decision de Luis
+-- 2026-07-30: el cliente sigue a la web; el oro se elimina). Tarjeta = arte
+-- horneado del mod duel_skin (panel con corte diagonal asimetrico + hairline
+-- cian->violeta + marcas HUD); boton = CTA con el degradado cian->violeta de la
+-- web. Los TTF viven en mods/fonts/ttf y los assets en mods/duel_skin/img
 -- (capas Duelfall; el submodulo solo lleva este applier).
+-- OJO: este es el UNICO punto donde el submodulo otclient conoce a Duelfall.
+-- Si se cambia el tema en gen_duel_skin.py, esta paleta hay que moverla a mano.
 local function applyDuelfallSkin()
     local INTER4 = '/fonts/ttf/inter400.ttf'
     local SAIRA6 = '/fonts/ttf/saira600.ttf'
     local SAIRA7 = '/fonts/ttf/saira700.ttf'
     local IMG = '/duel_skin/img/'
-    -- abyss previos: TXT #e8eef7, MUTE #8194b0, GOLD_TXT #cde2ff, BORDER #2a3448
-    local TXT, MUTE, GOLD_TXT = '#f0e6d2', '#a09b8c', '#f0e6d2'
-    local BORDER = '#5a4823'
+    -- hextech previos: TXT/GOLD_TXT #f0e6d2, MUTE #a09b8c, BORDER #5a4823
+    local TXT, MUTE, GOLD_TXT = '#e9f1ff', '#8798b4', '#e9f1ff'
+    local BORDER = '#22344f'
 
     enterGame:setImageSource(IMG .. 'panel_330x206.png')
     enterGame:setBackgroundColor('alpha')
@@ -212,7 +215,7 @@ local function applyDuelfallSkin()
             w:setTTFFont(INTER4, 13, 0, '#000000')
             w:setColor(TXT)
             w:setImageSource('')
-            w:setBackgroundColor('#010a13')
+            w:setBackgroundColor('#060a12')   -- hextech: #010a13
             w:setBorderWidth(1)
             w:setBorderColor(BORDER)
             w:setHeight(24)
@@ -227,7 +230,7 @@ local function applyDuelfallSkin()
     local link = enterGame:getChildById('websiteLink')
     if link then
         link:setTTFFont(INTER4, 12, 0, '#000000')
-        link:setColor('#3ec8ba')  -- cian hextech: el link es accion (magia); abyss: #7fb2ff
+        link:setColor('#25e5ff')  -- cian de circuito (accion); hextech: #3ec8ba
     end
     local btn = enterGame:getChildById('loginButton')
     if btn then
@@ -241,7 +244,7 @@ local function applyDuelfallSkin()
         btn:setBackgroundColor('alpha')
         btn:setBorderWidth(0)
         btn:setTTFFont(SAIRA6, 12, 0, '#000000')
-        btn:setColor('#04262a')
+        btn:setColor('#03060d')   -- hextech: #04262a
         btn:setWidth(112)
         btn:setHeight(28)
         fixBtn('btn_primary_112x28.png')
